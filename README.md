@@ -85,9 +85,8 @@ M.D.I.C. Rathnayaka
 
 💼 Informatics Institute of Technology (IIT) – University of Westminster
 
-📧 [add your email]
+📧 isuruchandika321@gmail.com
 
-🔗 [LinkedIn / Portfolio link if available]
 
 📜 License
 
