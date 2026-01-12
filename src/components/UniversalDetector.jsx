@@ -53,6 +53,60 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
     };
   }, []);
 
+  // Function to resize and convert image to 224x224
+  const resizeTo224x224 = (canvas, ctx, sourceCanvas, sourceCtx) => {
+    // Set target size
+    canvas.width = 224;
+    canvas.height = 224;
+    
+    // Clear and draw resized image
+    ctx.clearRect(0, 0, 224, 224);
+    
+    // Calculate aspect ratio
+    const sourceWidth = sourceCanvas.width;
+    const sourceHeight = sourceCanvas.height;
+    const sourceAspect = sourceWidth / sourceHeight;
+    const targetAspect = 224 / 224;
+    
+    let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+    
+    if (sourceAspect > targetAspect) {
+      // Source is wider - fit to height
+      drawHeight = 224;
+      drawWidth = 224 * sourceAspect;
+      offsetX = -(drawWidth - 224) / 2;
+    } else {
+      // Source is taller - fit to width
+      drawWidth = 224;
+      drawHeight = 224 / sourceAspect;
+      offsetY = -(drawHeight - 224) / 2;
+    }
+    
+    // Draw with letterboxing/pillarboxing to maintain aspect ratio
+    ctx.drawImage(sourceCanvas, offsetX, offsetY, drawWidth, drawHeight);
+    
+    return canvas;
+  };
+
+  // Function to convert to grayscale (for hand images)
+  const convertToGrayscale = (ctx) => {
+    const imgData = ctx.getImageData(0, 0, 224, 224);
+    const data = imgData.data;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      data[i] = gray;     // Red
+      data[i + 1] = gray; // Green
+      data[i + 2] = gray; // Blue
+      // Alpha channel stays the same
+    }
+    
+    ctx.putImageData(imgData, 0, 0);
+  };
+
   // Initialize MediaPipe Hands
   const initHands = () => {
     const hands = new Hands({
@@ -170,29 +224,27 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
         if (now - lastSent.current < 800) return;
         lastSent.current = now;
 
-        // Create cropped hand image (grayscale)
-        const off = document.createElement("canvas");
-        off.width = w;
-        off.height = h;
-        const offCtx = off.getContext("2d");
+        // Create temporary canvas for cropping
+        const tempCanvas = document.createElement("canvas");
+        const tempCtx = tempCanvas.getContext("2d");
+        
+        // Draw cropped hand to temp canvas
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        tempCtx.drawImage(videoRef.current, x, y, w, h, 0, 0, w, h);
 
-        // Draw cropped hand
-        offCtx.drawImage(videoRef.current, x, y, w, h, 0, 0, w, h);
+        // Create final 224x224 canvas
+        const finalCanvas = document.createElement("canvas");
+        const finalCtx = finalCanvas.getContext("2d");
+        
+        // Resize to 224x224
+        resizeTo224x224(finalCanvas, finalCtx, tempCanvas, tempCtx);
+        
+        // Convert to grayscale for hand images
+        convertToGrayscale(finalCtx);
 
-        // Convert to grayscale
-        const imgData = offCtx.getImageData(0, 0, w, h);
-        for (let i = 0; i < imgData.data.length; i += 4) {
-          const r = imgData.data[i];
-          const g = imgData.data[i + 1];
-          const b = imgData.data[i + 2];
-          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-          imgData.data[i] = gray;
-          imgData.data[i + 1] = gray;
-          imgData.data[i + 2] = gray;
-        }
-        offCtx.putImageData(imgData, 0, 0);
-
-        const dataUrl = off.toDataURL("image/jpeg", 0.9);
+        // Send the 224x224 image
+        const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.9);
         onSignFrame && onSignFrame(dataUrl);
       }
     });
@@ -296,7 +348,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
               if (!video || !canvas) return;
 
-              // Clear previous drawings (face and hand will be redrawn)
+              // Clear previous drawings
               const ctx = canvas.getContext("2d");
               if (video.videoWidth > 0) {
                 if (
@@ -377,7 +429,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                     : prev
                 );
 
-                // Send cropped face
+                // Send cropped face (resized to 224x224)
                 if (onFaceCropped) {
                   const padding = 20;
                   const cropX = Math.max(0, primaryFace.box.x - padding);
@@ -392,6 +444,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                   );
 
                   if (cropWidth > 0 && cropHeight > 0) {
+                    // Create temporary canvas for cropping
                     const tempCanvas = document.createElement("canvas");
                     const tempCtx = tempCanvas.getContext("2d");
                     tempCanvas.width = cropWidth;
@@ -409,14 +462,20 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                       cropHeight
                     );
 
-                    const dataUrl = tempCanvas.toDataURL("image/jpeg", 0.9);
+                    // Create final 224x224 canvas
+                    const finalCanvas = document.createElement("canvas");
+                    const finalCtx = finalCanvas.getContext("2d");
+                    
+                    // Resize to 224x224
+                    resizeTo224x224(finalCanvas, finalCtx, tempCanvas, tempCtx);
+
+                    const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.9);
                     onFaceCropped(dataUrl);
                   }
                 }
               }
 
               // Hand detection will be drawn by MediaPipe's onResults callback
-              // which runs asynchronously but draws on the same canvas
             } catch (error) {
               console.error("Face detection error:", error);
             }
@@ -464,24 +523,38 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
       />
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", border: "2px solid #4caf50" }}
+        style={{ width: "100%", maxWidth: "640px", border: "2px solid #4caf50" }}
       />
-      <div>
-        <button onClick={toggleDetection}>
+      <div style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5" }}>
+        <button 
+          onClick={toggleDetection}
+          style={{
+            padding: "10px 20px",
+            background: detectionActive ? "#f44336" : "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginBottom: "10px"
+          }}
+        >
           {detectionActive ? "⏸ Pause Detection" : "▶ Start Detection"}
         </button>
-        <div>
+        <div style={{ marginBottom: "5px" }}>
           <strong>Face Detection:</strong> {faceCount} face(s) detected
         </div>
-        <div>
+        <div style={{ marginBottom: "5px" }}>
           <strong>Hand Detection:</strong>{" "}
           {handDetected ? "✋ Hand detected" : "❌ No hand"}
         </div>
-        <div>
+        <div style={{ marginBottom: "5px" }}>
           <strong>Status:</strong> {detectionActive ? "● Active" : "○ Paused"}
         </div>
-        <div style={{ marginTop: 10 }}>
+        <div>
           <strong>FPS:</strong> {displayFPS}
+        </div>
+        <div style={{ marginTop: "10px", fontSize: "12px", color: "#666" }}>
+          <strong>Note:</strong> All images sent to backend are resized to 224×224 pixels
         </div>
       </div>
     </div>
