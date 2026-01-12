@@ -74,7 +74,7 @@ export default function FusionPage() {
       console.log("SIGN API RESPONSE:", data);
 
       // Normalize sign name: "55_Catch" → "Catch"
-      const rawSign = data.sign || "";
+      const rawSign = data.label || "";
       const cleanSign = rawSign.includes("_") ? rawSign.split("_")[1] : rawSign;
 
       if (data.confidence > 0.25) {
