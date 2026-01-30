@@ -1,39 +1,44 @@
-import React, { useCallback, useRef, useState, useEffect } from "react";
-import Detector from "../components/Detector";
-import SignDetector from "../components/Signdetector";
-import UnifiedDetector from "../components/UnifiedDetector.JSX";
+import React, { useCallback, useRef, useState } from "react";
 import UniversalDetector from "../components/UniversalDetector";
+
 export default function FusionPage() {
-  // -------- STATES --------
   const [emotion, setEmotion] = useState("—");
   const [emotionConf, setEmotionConf] = useState(0);
-
   const [sign, setSign] = useState("—");
   const [signConf, setSignConf] = useState(0);
-
   const [sentence, setSentence] = useState("Waiting for fusion...");
+  const [sequenceFrames, setSequenceFrames] = useState([]);
 
-  // -------- MEMORY (VERY IMPORTANT) --------
   const lastValidSign = useRef("—");
   const lastValidEmotion = useRef("—");
-
-  // -------- TIMERS --------
-  const lastEmotion = useRef(0);
   const lastSign = useRef(0);
   const lastFusion = useRef(0);
+  const FUSION_COOLDOWN = 3000;
 
-  const FUSION_COOLDOWN = 3000; // 3 seconds
-
-  // -------- BACKENDS --------
   const EMOTION_API = "http://127.0.0.1:5000/emotion/predict";
   const SIGN_API = "http://127.0.0.1:5001/sign/predict";
   const NLP_API = "http://127.0.0.1:5002/nlp/generate";
 
-  // ================= EMOTION HANDLER =================
+  const resetSignBuffer = async () => {
+    try {
+      await fetch("http://127.0.0.1:5001/sign/reset", {
+        method: "POST",
+      });
+
+      setSign("—");
+      setSignConf(0);
+      lastValidSign.current = "—";
+
+      console.log("🧹 Sign buffer cleared");
+    } catch (e) {
+      console.error("Reset error", e);
+    }
+  };
+
+  // Emotion handler (unchanged)
   const onFaceCropped = useCallback(async (dataUrl) => {
     const now = Date.now();
-    if (now - lastEmotion.current < 700) return;
-    lastEmotion.current = now;
+    if (now - lastSign.current < 700) return;
 
     try {
       const res = await fetch(EMOTION_API, {
@@ -56,11 +61,14 @@ export default function FusionPage() {
     }
   }, []);
 
-  // ================= SIGN HANDLER =================
+  // UPDATED: Sign handler to send sequence
   const onSignFrame = useCallback(async (dataUrl) => {
-    const now = Date.now();
-    if (now - lastSign.current < 800) return;
-    lastSign.current = now;
+    // 👇 STORE FRAME FOR PREVIEW
+    setSequenceFrames((prev) => {
+      const updated = [...prev, dataUrl];
+      if (updated.length > 30) updated.shift(); // keep last 30
+      return updated;
+    });
 
     try {
       const res = await fetch(SIGN_API, {
@@ -71,28 +79,22 @@ export default function FusionPage() {
 
       const data = await res.json();
 
-      console.log("SIGN API RESPONSE:", data);
+      if (data.status === "buffering") return;
 
-      // Normalize sign name: "55_Catch" → "Catch"
-      const rawSign = data.label || "";
-      const cleanSign = rawSign.includes("_") ? rawSign.split("_")[1] : rawSign;
-
-      if (data.confidence > 0.25) {
-        lastValidSign.current = cleanSign;
-        setSign(cleanSign);
+      if (data.confidence > 0.1) {
+        lastValidSign.current = data.label;
+        setSign(data.label);
         setSignConf(data.confidence);
-      } else {
-        setSign(lastValidSign.current);
+        setSequenceFrames([]);
       }
     } catch (e) {
       console.error("Sign error", e);
     }
   }, []);
 
-  // ================= FUSION LOGIC =================
-  useEffect(() => {
+  // Fusion logic (unchanged)
+  React.useEffect(() => {
     const now = Date.now();
-
     if (
       emotionConf > 0.4 &&
       signConf > 0.25 &&
@@ -114,39 +116,80 @@ export default function FusionPage() {
     }
   }, [emotionConf, signConf]);
 
-  // ================= UI =================
   return (
     <div style={{ padding: 20 }}>
-      <h1>🧠 SignFusion — Emotion + Sign (Single Page)</h1>
+      <h1>🧠 SignFusion — Emotion + Sign Language</h1>
 
       <div style={{ display: "flex", gap: 20 }}>
-        {/* <div style={{ flex: 1 }}>
-          <h3>Face Emotion</h3>
-          <Detector onFaceCropped={onFaceCropped} />
-          <p>
-            Emotion: <b>{emotion}</b>
-          </p>
-          <p>Confidence: {(emotionConf * 100).toFixed(1)}%</p>
+        <div style={{ flex: 2 }}>
+          <UniversalDetector
+            onFaceCropped={onFaceCropped}
+            onSignFrame={onSignFrame}
+          />
         </div>
 
-        <div style={{ flex: 1 }}>
-          <h3>Sign Language</h3>
-          <SignDetector onSignFrame={onSignFrame} />
-          <p>
-            Sign: <b>{sign}</b>
+        <div
+          style={{
+            flex: 1,
+            padding: 20,
+            background: "#f5f5f5",
+            borderRadius: "8px",
+          }}
+        >
+          <h3>📊 Predictions</h3>
+          <div style={{ marginBottom: 20 }}>
+            <div>
+              <strong>Emotion:</strong> {emotion}
+            </div>
+            <div>Confidence: {(emotionConf * 100).toFixed(1)}%</div>
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <div>
+              <strong>Sign:</strong> {sign}
+            </div>
+            <div>Confidence: {(signConf * 100).toFixed(1)}%</div>
+          </div>
+
+          <h3>🤖 Fused Output</h3>
+          <p style={{ fontSize: 18, fontWeight: "bold", color: "#2196F3" }}>
+            {sentence}
           </p>
-          <p>Confidence: {(signConf * 100).toFixed(1)}%</p>
-        </div> */}
-        <UniversalDetector
-          onFaceCropped={onFaceCropped}
-          onSignFrame={onSignFrame}
-        />
+          <h3>🎞 Sequence Frames</h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(10, 1fr)",
+              gap: "4px",
+              maxWidth: "500px",
+            }}
+          >
+            {sequenceFrames.map((frame, i) => (
+              <img
+                key={i}
+                src={frame}
+                alt={`frame-${i}`}
+                style={{ width: "100%", border: "1px solid #ccc" }}
+              />
+            ))}
+          </div>
+          <button
+            onClick={resetSignBuffer}
+            style={{
+              marginTop: "15px",
+              padding: "10px 15px",
+              background: "#ff9800",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            🔄 Reset Sign Detection
+          </button>
+        </div>
       </div>
-
-      <hr />
-
-      <h2>🗣️ Fused Output</h2>
-      <p style={{ fontSize: 22, fontWeight: "bold" }}>{sentence}</p>
     </div>
   );
 }

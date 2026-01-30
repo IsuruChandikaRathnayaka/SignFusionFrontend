@@ -7,104 +7,140 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  const lastFrameTime = useRef(performance.now());
-  const fps = useRef(0);
-  const [displayFPS, setDisplayFPS] = useState(0);
-
-  // Face detection states
-  const [modelsLoaded, setModelsLoaded] = useState(false);
+  // State variables
   const [detectionActive, setDetectionActive] = useState(true);
   const [faceCount, setFaceCount] = useState(0);
-
-  // Hand detection states
-  const lastSent = useRef(0);
   const [handDetected, setHandDetected] = useState(false);
 
-  // MediaPipe Hands instance
+  // Refs
   const handsRef = useRef(null);
+  const lastSent = useRef(0);
+  const prevCenterRef = useRef({ x: 0, y: 0 });
 
   // Load face-api models
   useEffect(() => {
-    let isMounted = true;
-
     const loadModels = async () => {
       try {
-        console.log("Loading face detection models...");
-
         const MODEL_URL = "/models";
-
-        // Load face detection model
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-
-        if (isMounted) {
-          console.log("Models loaded successfully!");
-          setModelsLoaded(true);
-        }
+        console.log("Face detection models loaded");
       } catch (error) {
         console.error("Error loading models:", error);
       }
     };
-
     loadModels();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  // Function to resize and convert image to 224x224
-  const resizeTo224x224 = (canvas, ctx, sourceCanvas, sourceCtx) => {
-    // Set target size
-    canvas.width = 224;
-    canvas.height = 224;
-    
-    // Clear and draw resized image
-    ctx.clearRect(0, 0, 224, 224);
-    
-    // Calculate aspect ratio
-    const sourceWidth = sourceCanvas.width;
-    const sourceHeight = sourceCanvas.height;
-    const sourceAspect = sourceWidth / sourceHeight;
-    const targetAspect = 224 / 224;
-    
-    let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-    
-    if (sourceAspect > targetAspect) {
-      // Source is wider - fit to height
-      drawHeight = 224;
-      drawWidth = 224 * sourceAspect;
-      offsetX = -(drawWidth - 224) / 2;
-    } else {
-      // Source is taller - fit to width
-      drawWidth = 224;
-      drawHeight = 224 / sourceAspect;
-      offsetY = -(drawHeight - 224) / 2;
-    }
-    
-    // Draw with letterboxing/pillarboxing to maintain aspect ratio
-    ctx.drawImage(sourceCanvas, offsetX, offsetY, drawWidth, drawHeight);
-    
-    return canvas;
+  // // Function to apply pink glove to any canvas
+  // const applyPinkGlove = (ctx, landmarks, width, height) => {
+  //   ctx.save();
+
+  //   // Dark pink color for glove
+  //   const pinkColor = "rgba(255, 105, 180, 0.9)"; // Hot pink
+  //   const pinkOutline = "rgba(219, 112, 147, 1)"; // Darker pink outline
+
+  //   // Draw fingers
+  //   const fingerConnections = [
+  //     [0, 1, 2, 3, 4], // Thumb
+  //     [0, 5, 6, 7, 8], // Index
+  //     [0, 9, 10, 11, 12], // Middle
+  //     [0, 13, 14, 15, 16], // Ring
+  //     [0, 17, 18, 19, 20], // Pinky
+  //   ];
+
+  //   // Draw each finger as filled shape
+  //   fingerConnections.forEach((finger) => {
+  //     if (finger.length >= 3) {
+  //       ctx.beginPath();
+  //       ctx.moveTo(
+  //         landmarks[finger[0]].x * width,
+  //         landmarks[finger[0]].y * height,
+  //       );
+
+  //       for (let i = 1; i < finger.length; i++) {
+  //         ctx.lineTo(
+  //           landmarks[finger[i]].x * width,
+  //           landmarks[finger[i]].y * height,
+  //         );
+  //       }
+
+  //       // Make shape thicker
+  //       for (let i = finger.length - 2; i >= 0; i--) {
+  //         const offsetX = 6;
+  //         const offsetY = 6;
+  //         ctx.lineTo(
+  //           landmarks[finger[i]].x * width + offsetX,
+  //           landmarks[finger[i]].y * height + offsetY,
+  //         );
+  //       }
+
+  //       ctx.closePath();
+  //       ctx.fillStyle = pinkColor;
+  //       ctx.strokeStyle = pinkOutline;
+  //       ctx.lineWidth = 2;
+  //       ctx.fill();
+  //       ctx.stroke();
+  //     }
+  //   });
+
+  //   // Draw palm
+  //   const palmPoints = [0, 5, 9, 13, 17];
+  //   ctx.beginPath();
+  //   palmPoints.forEach((pointIdx, index) => {
+  //     const point = landmarks[pointIdx];
+  //     if (index === 0) {
+  //       ctx.moveTo(point.x * width, point.y * height);
+  //     } else {
+  //       ctx.lineTo(point.x * width, point.y * height);
+  //     }
+  //   });
+  //   ctx.closePath();
+  //   ctx.fillStyle = pinkColor;
+  //   ctx.strokeStyle = pinkOutline;
+  //   ctx.lineWidth = 2;
+  //   ctx.fill();
+  //   ctx.stroke();
+
+  //   ctx.restore();
+  // };
+
+  // Function to resize image to 160x160 (for LSTM model)
+  const resizeTo160x160 = (sourceCanvas) => {
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = 160;
+    finalCanvas.height = 160;
+    const ctx = finalCanvas.getContext("2d");
+
+    // Fill black like dataset
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, 160, 160);
+
+    // Draw centered
+    ctx.drawImage(sourceCanvas, 0, 0, 160, 160);
+
+    return finalCanvas;
   };
 
-  // Function to convert to grayscale (for hand images)
-  const convertToGrayscale = (ctx) => {
-    const imgData = ctx.getImageData(0, 0, 224, 224);
+  // Function to convert to grayscale
+  const convertToGrayscale = (canvas) => {
+    const ctx = canvas.getContext("2d");
+    const imgData = ctx.getImageData(0, 0, 160, 160);
     const data = imgData.data;
-    
+
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
       const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      data[i] = gray;     // Red
+      data[i] = gray; // Red
       data[i + 1] = gray; // Green
       data[i + 2] = gray; // Blue
       // Alpha channel stays the same
     }
-    
+
     ctx.putImageData(imgData, 0, 0);
+    return canvas;
   };
 
   // Initialize MediaPipe Hands
@@ -129,9 +165,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
       const ctx = canvas.getContext("2d");
 
-      // Clear hand-related drawings but keep face drawings
-      // We'll redraw everything in the detection loop
-
       if (!results.multiHandLandmarks?.length) {
         setHandDetected(false);
         return;
@@ -140,8 +173,11 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
       setHandDetected(true);
       const lm = results.multiHandLandmarks[0];
 
-      // Draw hand landmarks
       if (lm && ctx) {
+        // Apply pink glove to display canvas
+        // applyPinkGlove(ctx, lm, canvas.width, canvas.height);
+
+        // Draw hand landmarks (optional)
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 2;
 
@@ -176,21 +212,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           ctx.stroke();
         });
 
-        // Draw landmarks
-        lm.forEach((point) => {
-          ctx.fillStyle = "cyan";
-          ctx.beginPath();
-          ctx.arc(
-            point.x * canvas.width,
-            point.y * canvas.height,
-            4,
-            0,
-            2 * Math.PI
-          );
-          ctx.fill();
-        });
-
-        // Calculate bounding box
+        // 🔥 BETTER HAND CROP (CENTERED + SQUARE)
         let minX = 1,
           minY = 1,
           maxX = 0,
@@ -202,50 +224,75 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           maxY = Math.max(maxY, p.y);
         });
 
-        const pad = 30;
-        const x = Math.max(0, minX * canvas.width - pad);
-        const y = Math.max(0, minY * canvas.height - pad);
-        const w = Math.min(
-          canvas.width - x,
-          (maxX - minX) * canvas.width + pad * 2
-        );
-        const h = Math.min(
-          canvas.height - y,
-          (maxY - minY) * canvas.height + pad * 2
-        );
+        // get center of hand
+        let cx = 0,
+          cy = 0;
+        lm.forEach((p) => {
+          cx += p.x;
+          cy += p.y;
+        });
+        cx /= lm.length;
+        cy /= lm.length;
+
+        // square size based on hand size
+        const boxSize = Math.max(maxX - minX, maxY - minY) * canvas.width * 2.0;
+
+        // centered square
+        const x = Math.max(0, cx * canvas.width - boxSize / 2);
+        const y = Math.max(0, cy * canvas.height - boxSize / 2);
+        const w = Math.min(canvas.width - x, boxSize);
+        const h = Math.min(canvas.height - y, boxSize);
 
         // Draw bounding box
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 2;
         ctx.strokeRect(x, y, w, h);
 
-        // Throttle sending hand frame
+        // Throttle frame collection
         const now = Date.now();
-        if (now - lastSent.current < 800) return;
+        if (now - lastSent.current < 250) return; // 3-4 FPS
         lastSent.current = now;
 
         // Create temporary canvas for cropping
         const tempCanvas = document.createElement("canvas");
         const tempCtx = tempCanvas.getContext("2d");
-        
-        // Draw cropped hand to temp canvas
         tempCanvas.width = w;
         tempCanvas.height = h;
-        tempCtx.drawImage(videoRef.current, x, y, w, h, 0, 0, w, h);
+        tempCtx.drawImage(
+          videoRef.current,
+          x,
+          y,
+          w,
+          h,
+          0,
+          0,
+          tempCanvas.width,
+          tempCanvas.height,
+        );
 
-        // Create final 224x224 canvas
-        const finalCanvas = document.createElement("canvas");
-        const finalCtx = finalCanvas.getContext("2d");
-        
-        // Resize to 224x224
-        resizeTo224x224(finalCanvas, finalCtx, tempCanvas, tempCtx);
-        
-        // Convert to grayscale for hand images
-        convertToGrayscale(finalCtx);
+        // Apply pink glove to the cropped hand too
+        const scaledLandmarks = lm.map((point) => ({
+          x: (point.x * canvas.width - x) / w,
+          y: (point.y * canvas.height - y) / h,
+        }));
+        // applyPinkGlove(tempCtx, scaledLandmarks, w, h);
 
-        // Send the 224x224 image
-        const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.9);
-        onSignFrame && onSignFrame(dataUrl);
+        // Resize to 160x160
+        const resizedCanvas = resizeTo160x160(tempCanvas);
+
+        const dataUrl = resizedCanvas.toDataURL("image/jpeg", 0.9);
+
+        // ===== FRAME STABILITY FILTER =====
+        const prevX = prevCenterRef.current.x;
+        const prevY = prevCenterRef.current.y;
+
+        // only send frame if hand is stable (not jumping)
+        if (Math.abs(prevX - cx) < 0.015 && Math.abs(prevY - cy) < 0.015) {
+          onSignFrame && onSignFrame(dataUrl);
+        }
+
+        // update previous center
+        prevCenterRef.current = { x: cx, y: cy };
       }
     });
 
@@ -255,22 +302,19 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
   // Main initialization
   useEffect(() => {
-    if (!modelsLoaded) return;
-
     let stream = null;
     let isMounted = true;
     let camera = null;
     let faceAnimationFrameId = null;
     let lastFaceDetectionTime = 0;
-    const FACE_DETECTION_INTERVAL = 300; // ms
+    const FACE_DETECTION_INTERVAL = 300;
 
     const startCamera = async () => {
       try {
-        // Camera constraints
         const constraints = {
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
             facingMode: "user",
             frameRate: { ideal: 30 },
           },
@@ -285,11 +329,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           videoRef.current.srcObject = stream;
 
           await new Promise((resolve, reject) => {
-            if (!videoRef.current) {
-              reject(new Error("Video ref not available"));
-              return;
-            }
-
             const onLoaded = () => {
               videoRef.current.removeEventListener("loadedmetadata", onLoaded);
               videoRef.current.removeEventListener("error", onError);
@@ -304,12 +343,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
             videoRef.current.addEventListener("loadedmetadata", onLoaded);
             videoRef.current.addEventListener("error", onError);
-
-            setTimeout(() => {
-              videoRef.current.removeEventListener("loadedmetadata", onLoaded);
-              videoRef.current.removeEventListener("error", onError);
-              reject(new Error("Video load timeout"));
-            }, 10000);
+            setTimeout(() => reject(new Error("Video load timeout")), 10000);
           });
 
           await videoRef.current.play();
@@ -324,8 +358,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                 await handsRef.current.send({ image: videoRef.current });
               }
             },
-            width: 1280,
-            height: 720,
+            width: 640,
+            height: 480,
           });
 
           camera.start();
@@ -348,7 +382,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
               if (!video || !canvas) return;
 
-              // Clear previous drawings
               const ctx = canvas.getContext("2d");
               if (video.videoWidth > 0) {
                 if (
@@ -359,10 +392,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                   canvas.height = video.videoHeight;
                 }
 
-                // Clear entire canvas
+                // Clear canvas and draw video
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                // Draw video frame
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               }
 
@@ -372,28 +403,12 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                 new faceapi.TinyFaceDetectorOptions({
                   inputSize: 320,
                   scoreThreshold: 0.5,
-                })
+                }),
               );
-
-              // ================= FPS CALCULATION =================
-              const nowFPS = performance.now();
-              const delta = nowFPS - lastFrameTime.current;
-              lastFrameTime.current = nowFPS;
-
-              const instantFPS = 1000 / delta;
-
-              // Exponential Moving Average for smooth FPS
-              fps.current =
-                fps.current === 0
-                  ? instantFPS
-                  : 0.9 * fps.current + 0.1 * instantFPS;
-
-              setDisplayFPS(fps.current.toFixed(1));
-              // ================================================================
 
               setFaceCount(detections.length);
 
-              // Draw face detections
+              // DRAW FACE DETECTIONS
               if (detections.length > 0) {
                 detections.forEach((detection, i) => {
                   const box = detection.box;
@@ -420,62 +435,57 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
                   ctx.fillStyle = "#4CAF50";
                   ctx.fillText(text, box.x + 10, box.y - 10);
                 });
+              }
 
-                // Process the most prominent face
+              // Send face for emotion detection
+              if (detections.length > 0 && onFaceCropped) {
                 const primaryFace = detections.reduce((prev, current) =>
                   current.box.width * current.box.height >
                   prev.box.width * prev.box.height
                     ? current
-                    : prev
+                    : prev,
                 );
 
-                // Send cropped face (resized to 224x224)
-                if (onFaceCropped) {
-                  const padding = 20;
-                  const cropX = Math.max(0, primaryFace.box.x - padding);
-                  const cropY = Math.max(0, primaryFace.box.y - padding);
-                  const cropWidth = Math.min(
-                    video.videoWidth - cropX,
-                    primaryFace.box.width + padding * 2
+                const padding = 20;
+                const cropX = Math.max(0, primaryFace.box.x - padding);
+                const cropY = Math.max(0, primaryFace.box.y - padding);
+                const cropWidth = Math.min(
+                  video.videoWidth - cropX,
+                  primaryFace.box.width + padding * 2,
+                );
+                const cropHeight = Math.min(
+                  video.videoHeight - cropY,
+                  primaryFace.box.height + padding * 2,
+                );
+
+                if (cropWidth > 0 && cropHeight > 0) {
+                  const tempCanvas = document.createElement("canvas");
+                  const tempCtx = tempCanvas.getContext("2d");
+                  tempCanvas.width = cropWidth;
+                  tempCanvas.height = cropHeight;
+
+                  tempCtx.drawImage(
+                    video,
+                    cropX,
+                    cropY,
+                    cropWidth,
+                    cropHeight,
+                    0,
+                    0,
+                    cropWidth,
+                    cropHeight,
                   );
-                  const cropHeight = Math.min(
-                    video.videoHeight - cropY,
-                    primaryFace.box.height + padding * 2
-                  );
 
-                  if (cropWidth > 0 && cropHeight > 0) {
-                    // Create temporary canvas for cropping
-                    const tempCanvas = document.createElement("canvas");
-                    const tempCtx = tempCanvas.getContext("2d");
-                    tempCanvas.width = cropWidth;
-                    tempCanvas.height = cropHeight;
+                  const finalCanvas = document.createElement("canvas");
+                  const finalCtx = finalCanvas.getContext("2d");
+                  finalCanvas.width = 224;
+                  finalCanvas.height = 224;
+                  finalCtx.drawImage(tempCanvas, 0, 0, 224, 224);
 
-                    tempCtx.drawImage(
-                      video,
-                      cropX,
-                      cropY,
-                      cropWidth,
-                      cropHeight,
-                      0,
-                      0,
-                      cropWidth,
-                      cropHeight
-                    );
-
-                    // Create final 224x224 canvas
-                    const finalCanvas = document.createElement("canvas");
-                    const finalCtx = finalCanvas.getContext("2d");
-                    
-                    // Resize to 224x224
-                    resizeTo224x224(finalCanvas, finalCtx, tempCanvas, tempCtx);
-
-                    const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.9);
-                    onFaceCropped(dataUrl);
-                  }
+                  const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.9);
+                  onFaceCropped(dataUrl);
                 }
               }
-
-              // Hand detection will be drawn by MediaPipe's onResults callback
             } catch (error) {
               console.error("Face detection error:", error);
             }
@@ -484,7 +494,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
               faceAnimationFrameId = requestAnimationFrame(detectFaces);
             }
           };
-
           detectFaces();
         }
       } catch (error) {
@@ -506,10 +515,13 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [modelsLoaded, detectionActive, onFaceCropped]);
+  }, [detectionActive, onFaceCropped]);
 
   const toggleDetection = () => {
     setDetectionActive(!detectionActive);
+    if (!detectionActive) {
+      // Clear buffer when starting fresh
+    }
   };
 
   return (
@@ -523,10 +535,16 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
       />
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", maxWidth: "640px", border: "2px solid #4caf50" }}
+        style={{
+          width: "100%",
+          maxWidth: "640px",
+          border: "2px solid #4caf50",
+        }}
       />
-      <div style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5" }}>
-        <button 
+      <div
+        style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5" }}
+      >
+        <button
           onClick={toggleDetection}
           style={{
             padding: "10px 20px",
@@ -535,7 +553,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
             border: "none",
             borderRadius: "4px",
             cursor: "pointer",
-            marginBottom: "10px"
+            marginBottom: "10px",
           }}
         >
           {detectionActive ? "⏸ Pause Detection" : "▶ Start Detection"}
@@ -547,14 +565,13 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           <strong>Hand Detection:</strong>{" "}
           {handDetected ? "✋ Hand detected" : "❌ No hand"}
         </div>
+
         <div style={{ marginBottom: "5px" }}>
           <strong>Status:</strong> {detectionActive ? "● Active" : "○ Paused"}
         </div>
-        <div>
-          <strong>FPS:</strong> {displayFPS}
-        </div>
-        <div style={{ marginTop: "10px", fontSize: "12px", color: "#666" }}>
-          <strong>Note:</strong> All images sent to backend are resized to 224×224 pixels
+        <div style={{ fontSize: "12px", color: "#666", marginTop: "10px" }}>
+          <strong>Note:</strong> Collecting 30 frames (160x160 grayscale) for
+          LSTM prediction
         </div>
       </div>
     </div>
