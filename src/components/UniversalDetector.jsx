@@ -153,8 +153,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
     hands.setOptions({
       maxNumHands: 1,
       modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
+      minDetectionConfidence: 0.4,
+      minTrackingConfidence: 0.4,
     });
 
     hands.onResults((results) => {
@@ -211,31 +211,23 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           ctx.lineTo(lm[end].x * canvas.width, lm[end].y * canvas.height);
           ctx.stroke();
         });
+        // ===== DATASET-MATCHED CROP =====
 
-        // 🔥 BETTER HAND CROP (CENTERED + SQUARE)
-        let minX = 1,
-          minY = 1,
-          maxX = 0,
-          maxY = 0;
-        lm.forEach((p) => {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
-        });
+        // Landmarks are normalized → convert like dataset
+        const xs = lm.map((p) => p.x);
+        const ys = lm.map((p) => p.y);
 
-        // get center of hand
-        let cx = 0,
-          cy = 0;
-        lm.forEach((p) => {
-          cx += p.x;
-          cy += p.y;
-        });
-        cx /= lm.length;
-        cy /= lm.length;
+        const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
+        const cy = ys.reduce((a, b) => a + b, 0) / ys.length;
 
-        // square size based on hand size
-        const boxSize = Math.max(maxX - minX, maxY - minY) * canvas.width * 2.0;
+        // EXACT SAME LOGIC AS DATASET
+        const handSizeNorm = Math.max(
+          Math.max(...xs) - Math.min(...xs),
+          Math.max(...ys) - Math.min(...ys),
+        );
+
+        // dataset did: * w * 2.0
+        const boxSize = handSizeNorm * canvas.width * 2.6; // 🔥 2.6 gives elbow room
 
         // centered square
         const x = Math.max(0, cx * canvas.width - boxSize / 2);

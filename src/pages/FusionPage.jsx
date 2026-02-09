@@ -28,7 +28,7 @@ export default function FusionPage() {
       setSign("—");
       setSignConf(0);
       lastValidSign.current = "—";
-
+      setSequenceFrames([]);
       console.log("🧹 Sign buffer cleared");
     } catch (e) {
       console.error("Reset error", e);
@@ -96,8 +96,8 @@ export default function FusionPage() {
   React.useEffect(() => {
     const now = Date.now();
     if (
-      emotionConf > 0.4 &&
-      signConf > 0.25 &&
+      emotionConf > 0 &&
+      signConf > 0 &&
       now - lastFusion.current > FUSION_COOLDOWN
     ) {
       lastFusion.current = now;

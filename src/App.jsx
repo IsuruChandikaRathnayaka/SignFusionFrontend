@@ -3,6 +3,7 @@ import EmotionPage from "./pages/EmotionPage";
 import SignPage from "./pages/SignPage";
 import "./App.css";
 import FusionPage from "./pages/FusionPage";
+import VerifyPage from "./components/VerifyPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<FusionPage />} />
         <Route path="/sign" element={<SignPage />} />
+        <Route path="/verify" element={<VerifyPage />} />
       </Routes>
     </BrowserRouter>
   );
