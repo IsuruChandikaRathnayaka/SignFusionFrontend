@@ -3,7 +3,7 @@ import { Hands } from "@mediapipe/hands";
 import { Camera } from "@mediapipe/camera_utils";
 import * as faceapi from "face-api.js";
 
-export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLost, disableHands = false }) {
+export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLost }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -318,8 +318,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
           // Start MediaPipe camera
           camera = new Camera(videoRef.current, {
             onFrame: async () => {
-              if (detectionActive && handsRef.current && !disableHands) {
-                // Hand detection currently active for Sign/Fusion
+              if (detectionActive && handsRef.current) {
                 await handsRef.current.send({ image: videoRef.current });
               }
             },
@@ -490,7 +489,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", maxWidth: "640px" }}>
+    <div>
       <video
         ref={videoRef}
         autoPlay
@@ -502,92 +501,42 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
         ref={canvasRef}
         style={{
           width: "100%",
-          borderRadius: "16px",
-          display: "block",
-          border: "2px solid var(--surface-border)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
+          maxWidth: "640px",
+          border: "2px solid #4caf50",
         }}
       />
-
-      {/* Premium Status Overlay */}
-      <div style={{
-        position: "absolute",
-        top: 20,
-        left: 20,
-        right: 20,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        pointerEvents: "none"
-      }}>
-        <div className="glass-card" style={{
-          padding: "4px 4px 4px 12px",
-          borderRadius: "12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          pointerEvents: "auto"
-        }}>
-          <div style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: detectionActive ? "#22c55e" : "#ef4444",
-            boxShadow: `0 0 10px ${detectionActive ? "#22c55e" : "#ef4444"}`
-          }} />
-          <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            {detectionActive ? "Live" : "Paused"}
-          </span>
-          <button
-            onClick={toggleDetection}
-            style={{
-              padding: "6px 12px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "8px",
-              color: "white",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "var(--transition)"
-            }}
-            onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.1)"}
-            onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.05)"}
-          >
-            {detectionActive ? "Pause" : "Resume"}
-          </button>
+      <div
+        style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5" }}
+      >
+        <button
+          onClick={toggleDetection}
+          style={{
+            padding: "10px 20px",
+            background: detectionActive ? "#f44336" : "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginBottom: "10px",
+          }}
+        >
+          {detectionActive ? "⏸ Pause Detection" : "▶ Start Detection"}
+        </button>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Face Detection:</strong> {faceCount} face(s) detected
+        </div>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Hand Detection:</strong>{" "}
+          {handDetected ? "✋ Hand detected" : "❌ No hand"}
         </div>
 
-        <div className="glass-card" style={{
-          padding: "8px 16px",
-          borderRadius: "12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          pointerEvents: "auto",
-          display: disableHands ? "none" : "flex" // Hide hand status in emotion mode
-        }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "white" }}>
-            HAND: {handDetected ? "✋" : "❌"}
-          </span>
-          <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)" }} />
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "white" }}>
-            FACES: {faceCount}
-          </span>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Status:</strong> {detectionActive ? "● Active" : "○ Paused"}
         </div>
-      </div>
-
-      <div style={{
-        marginTop: 16,
-        padding: "12px 20px",
-        background: "rgba(255,255,255,0.02)",
-        borderRadius: "12px",
-        fontSize: "0.75rem",
-        color: "var(--text-muted)",
-        border: "1px solid rgba(255,255,255,0.05)",
-        textAlign: "center"
-      }}>
-        <strong>Sequence Engine:</strong> Collecting 30 frames (160x160) for LSTM temporal inference.
+        <div style={{ fontSize: "12px", color: "#666", marginTop: "10px" }}>
+          <strong>Note:</strong> Collecting 30 frames (160x160 grayscale) for
+          LSTM prediction
+        </div>
       </div>
     </div>
   );

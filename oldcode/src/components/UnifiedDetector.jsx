@@ -3,7 +3,7 @@ import { Hands } from "@mediapipe/hands";
 import { Camera } from "@mediapipe/camera_utils";
 import * as faceapi from "face-api.js";
 
-export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLost, disableHands = false }) {
+export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -11,6 +11,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
   const [detectionActive, setDetectionActive] = useState(true);
   const [faceCount, setFaceCount] = useState(0);
   const [handDetected, setHandDetected] = useState(false);
+  const [sequenceFrames, setSequenceFrames] = useState([]);
 
   // Refs
   const handsRef = useRef(null);
@@ -32,44 +33,77 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
     loadModels();
   }, []);
 
-  // Function to apply pink glove with custom thickness
-  const applyPinkGloveWithThickness = (ctx, landmarks, width, height, thick) => {
+  // Function to apply pink glove to any canvas
+  const applyPinkGlove = (ctx, landmarks, width, height) => {
     ctx.save();
-    const pinkColor = "rgb(143, 20, 74)";
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
 
+    // Dark pink color for glove
+    const pinkColor = "rgba(255, 105, 180, 0.9)"; // Hot pink
+    const pinkOutline = "rgba(219, 112, 147, 1)"; // Darker pink outline
+
+    // Draw fingers
     const fingerConnections = [
-      [0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [0, 9, 10, 11, 12],
-      [0, 13, 14, 15, 16], [0, 17, 18, 19, 20],
+      [0, 1, 2, 3, 4], // Thumb
+      [0, 5, 6, 7, 8], // Index
+      [0, 9, 10, 11, 12], // Middle
+      [0, 13, 14, 15, 16], // Ring
+      [0, 17, 18, 19, 20], // Pinky
     ];
 
+    // Draw each finger as filled shape
     fingerConnections.forEach((finger) => {
-      ctx.beginPath();
-      ctx.strokeStyle = pinkColor;
-      ctx.lineWidth = thick;
-      ctx.moveTo(landmarks[finger[0]].x * width, landmarks[finger[0]].y * height);
-      for (let i = 1; i < finger.length; i++) {
-        ctx.lineTo(landmarks[finger[i]].x * width, landmarks[finger[i]].y * height);
+      if (finger.length >= 3) {
+        ctx.beginPath();
+        ctx.moveTo(
+          landmarks[finger[0]].x * width,
+          landmarks[finger[0]].y * height,
+        );
+
+        for (let i = 1; i < finger.length; i++) {
+          ctx.lineTo(
+            landmarks[finger[i]].x * width,
+            landmarks[finger[i]].y * height,
+          );
+        }
+
+        // Make shape thicker
+        for (let i = finger.length - 2; i >= 0; i--) {
+          const offsetX = 6;
+          const offsetY = 6;
+          ctx.lineTo(
+            landmarks[finger[i]].x * width + offsetX,
+            landmarks[finger[i]].y * height + offsetY,
+          );
+        }
+
+        ctx.closePath();
+        ctx.fillStyle = pinkColor;
+        ctx.strokeStyle = pinkOutline;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
       }
-      ctx.stroke();
     });
 
-    const palmPoints = [0, 1, 5, 9, 13, 17, 0];
+    // Draw palm
+    const palmPoints = [0, 5, 9, 13, 17];
     ctx.beginPath();
-    ctx.moveTo(landmarks[0].x * width, landmarks[0].y * height);
-    palmPoints.forEach((idx) => {
-      ctx.lineTo(landmarks[idx].x * width, landmarks[idx].y * height);
+    palmPoints.forEach((pointIdx, index) => {
+      const point = landmarks[pointIdx];
+      if (index === 0) {
+        ctx.moveTo(point.x * width, point.y * height);
+      } else {
+        ctx.lineTo(point.x * width, point.y * height);
+      }
     });
     ctx.closePath();
     ctx.fillStyle = pinkColor;
+    ctx.strokeStyle = pinkOutline;
+    ctx.lineWidth = 2;
     ctx.fill();
-    ctx.restore();
-  };
+    ctx.stroke();
 
-  // Function to apply pink glove to any canvas
-  const applyPinkGlove = (ctx, landmarks, width, height) => {
-    applyPinkGloveWithThickness(ctx, landmarks, width, height, width * 0.08);
+    ctx.restore();
   };
 
   // Function to resize image to 160x160 (for LSTM model)
@@ -79,9 +113,9 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
     finalCanvas.height = 160;
     const ctx = finalCanvas.getContext("2d");
 
-    // ❌ DONT FILL BLACK - keep natural background like dataset
-    // ctx.fillStyle = "black";
-    // ctx.fillRect(0, 0, 160, 160);
+    // Fill black like dataset
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, 160, 160);
 
     // Draw centered
     ctx.drawImage(sourceCanvas, 0, 0, 160, 160);
@@ -120,8 +154,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
     hands.setOptions({
       maxNumHands: 1,
       modelComplexity: 1,
-      minDetectionConfidence: 0.4,
-      minTrackingConfidence: 0.4,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6,
     });
 
     hands.onResults((results) => {
@@ -133,10 +167,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
       const ctx = canvas.getContext("2d");
 
       if (!results.multiHandLandmarks?.length) {
-        if (handDetected) {
-          setHandDetected(false);
-          if (onHandLost) onHandLost();
-        }
+        setHandDetected(false);
         return;
       }
 
@@ -181,32 +212,37 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
           ctx.lineTo(lm[end].x * canvas.width, lm[end].y * canvas.height);
           ctx.stroke();
         });
-        // ===== DATASET-MATCHED CROP =====
 
-        // Landmarks are normalized → convert like dataset
-        const xs = lm.map((p) => p.x);
-        const ys = lm.map((p) => p.y);
+        // 🔥 BETTER HAND CROP (CENTERED + SQUARE)
+        let minX = 1,
+          minY = 1,
+          maxX = 0,
+          maxY = 0;
+        lm.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
 
-        const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
-        const cy = ys.reduce((a, b) => a + b, 0) / ys.length;
+        // get center of hand
+        let cx = 0,
+          cy = 0;
+        lm.forEach((p) => {
+          cx += p.x;
+          cy += p.y;
+        });
+        cx /= lm.length;
+        cy /= lm.length;
 
-        // Calculate hand size in absolute pixels for accurate comparison
-        const handW_px = (Math.max(...xs) - Math.min(...xs)) * canvas.width;
-        const handH_px = (Math.max(...ys) - Math.min(...ys)) * canvas.height;
-
-        // Use 1.8x for a tight hand crop (LSA64 style)
-        const boxSize = Math.max(handW_px, handH_px) * 1.8;
+        // square size based on hand size
+        const boxSize = Math.max(maxX - minX, maxY - minY) * canvas.width * 2.0;
 
         // centered square
-        let x = cx * canvas.width - boxSize / 2;
-        let y = cy * canvas.height - boxSize / 2;
-
-        // Ensure we stay within the video frame to avoid black borders
-        x = Math.max(0, Math.min(canvas.width - boxSize, x));
-        y = Math.max(0, Math.min(canvas.height - boxSize, y));
-
-        const w = Math.min(boxSize, canvas.width);
-        const h = Math.min(boxSize, canvas.height);
+        const x = Math.max(0, cx * canvas.width - boxSize / 2);
+        const y = Math.max(0, cy * canvas.height - boxSize / 2);
+        const w = Math.min(canvas.width - x, boxSize);
+        const h = Math.min(canvas.height - y, boxSize);
 
         // Draw bounding box
         ctx.strokeStyle = "lime";
@@ -215,7 +251,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
 
         // Throttle frame collection
         const now = Date.now();
-        if (now - lastSent.current < 100) return; // 10 FPS
+        if (now - lastSent.current < 250) return; // 3-4 FPS
         lastSent.current = now;
 
         // Create temporary canvas for cropping
@@ -235,27 +271,28 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
           tempCanvas.height,
         );
 
-        // Apply pink glove to the cropped hand
-        // Use a thickness proportional to the HAND itself, not the frame
-        const gloveThickness = Math.max(handW_px, handH_px) * 0.15;
+        // Apply pink glove to the cropped hand too
         const scaledLandmarks = lm.map((point) => ({
           x: (point.x * canvas.width - x) / w,
           y: (point.y * canvas.height - y) / h,
         }));
-
-        // Refined apply pink glove call with custom thickness
-        applyPinkGloveWithThickness(tempCtx, scaledLandmarks, w, h, gloveThickness);
+        applyPinkGlove(tempCtx, scaledLandmarks, w, h);
 
         // Resize to 160x160
         const resizedCanvas = resizeTo160x160(tempCanvas);
 
         const dataUrl = resizedCanvas.toDataURL("image/jpeg", 0.9);
 
-        // ===== FRAME STABILITY FILTER REMOVED =====
-        // Always sending frame if hand is detected to capture motion
-        onSignFrame && onSignFrame(dataUrl);
+        // ===== FRAME STABILITY FILTER =====
+        const prevX = prevCenterRef.current.x;
+        const prevY = prevCenterRef.current.y;
 
-        // update previous center (kept for debugging if needed)
+        // only send frame if hand is stable (not jumping)
+        if (Math.abs(prevX - cx) < 0.015 && Math.abs(prevY - cy) < 0.015) {
+          onSignFrame && onSignFrame(dataUrl);
+        }
+
+        // update previous center
         prevCenterRef.current = { x: cx, y: cy };
       }
     });
@@ -318,8 +355,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
           // Start MediaPipe camera
           camera = new Camera(videoRef.current, {
             onFrame: async () => {
-              if (detectionActive && handsRef.current && !disableHands) {
-                // Hand detection currently active for Sign/Fusion
+              if (detectionActive && handsRef.current) {
                 await handsRef.current.send({ image: videoRef.current });
               }
             },
@@ -406,7 +442,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
               if (detections.length > 0 && onFaceCropped) {
                 const primaryFace = detections.reduce((prev, current) =>
                   current.box.width * current.box.height >
-                    prev.box.width * prev.box.height
+                  prev.box.width * prev.box.height
                     ? current
                     : prev,
                 );
@@ -490,7 +526,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", maxWidth: "640px" }}>
+    <div>
       <video
         ref={videoRef}
         autoPlay
@@ -502,92 +538,42 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
         ref={canvasRef}
         style={{
           width: "100%",
-          borderRadius: "16px",
-          display: "block",
-          border: "2px solid var(--surface-border)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.3)"
+          maxWidth: "640px",
+          border: "2px solid #4caf50",
         }}
       />
-
-      {/* Premium Status Overlay */}
-      <div style={{
-        position: "absolute",
-        top: 20,
-        left: 20,
-        right: 20,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        pointerEvents: "none"
-      }}>
-        <div className="glass-card" style={{
-          padding: "4px 4px 4px 12px",
-          borderRadius: "12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          pointerEvents: "auto"
-        }}>
-          <div style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: detectionActive ? "#22c55e" : "#ef4444",
-            boxShadow: `0 0 10px ${detectionActive ? "#22c55e" : "#ef4444"}`
-          }} />
-          <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "white", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            {detectionActive ? "Live" : "Paused"}
-          </span>
-          <button
-            onClick={toggleDetection}
-            style={{
-              padding: "6px 12px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "8px",
-              color: "white",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "var(--transition)"
-            }}
-            onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.1)"}
-            onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.05)"}
-          >
-            {detectionActive ? "Pause" : "Resume"}
-          </button>
+      <div
+        style={{ marginTop: "10px", padding: "10px", background: "#f5f5f5" }}
+      >
+        <button
+          onClick={toggleDetection}
+          style={{
+            padding: "10px 20px",
+            background: detectionActive ? "#f44336" : "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginBottom: "10px",
+          }}
+        >
+          {detectionActive ? "⏸ Pause Detection" : "▶ Start Detection"}
+        </button>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Face Detection:</strong> {faceCount} face(s) detected
+        </div>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Hand Detection:</strong>{" "}
+          {handDetected ? "✋ Hand detected" : "❌ No hand"}
         </div>
 
-        <div className="glass-card" style={{
-          padding: "8px 16px",
-          borderRadius: "12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          pointerEvents: "auto",
-          display: disableHands ? "none" : "flex" // Hide hand status in emotion mode
-        }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "white" }}>
-            HAND: {handDetected ? "✋" : "❌"}
-          </span>
-          <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)" }} />
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "white" }}>
-            FACES: {faceCount}
-          </span>
+        <div style={{ marginBottom: "5px" }}>
+          <strong>Status:</strong> {detectionActive ? "● Active" : "○ Paused"}
         </div>
-      </div>
-
-      <div style={{
-        marginTop: 16,
-        padding: "12px 20px",
-        background: "rgba(255,255,255,0.02)",
-        borderRadius: "12px",
-        fontSize: "0.75rem",
-        color: "var(--text-muted)",
-        border: "1px solid rgba(255,255,255,0.05)",
-        textAlign: "center"
-      }}>
-        <strong>Sequence Engine:</strong> Collecting 30 frames (160x160) for LSTM temporal inference.
+        <div style={{ fontSize: "12px", color: "#666", marginTop: "10px" }}>
+          <strong>Note:</strong> Collecting 30 frames (160x160 grayscale) for
+          LSTM prediction
+        </div>
       </div>
     </div>
   );
