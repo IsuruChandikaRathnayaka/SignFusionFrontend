@@ -3,7 +3,7 @@ import { Hands } from "@mediapipe/hands";
 import { Camera } from "@mediapipe/camera_utils";
 import * as faceapi from "face-api.js";
 
-export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
+export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLost }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -32,78 +32,45 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
     loadModels();
   }, []);
 
-  // // Function to apply pink glove to any canvas
-  // const applyPinkGlove = (ctx, landmarks, width, height) => {
-  //   ctx.save();
+  // Function to apply pink glove with custom thickness
+  const applyPinkGloveWithThickness = (ctx, landmarks, width, height, thick) => {
+    ctx.save();
+    const pinkColor = "rgb(143, 20, 74)";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-  //   // Dark pink color for glove
-  //   const pinkColor = "rgba(255, 105, 180, 0.9)"; // Hot pink
-  //   const pinkOutline = "rgba(219, 112, 147, 1)"; // Darker pink outline
+    const fingerConnections = [
+      [0, 1, 2, 3, 4], [0, 5, 6, 7, 8], [0, 9, 10, 11, 12],
+      [0, 13, 14, 15, 16], [0, 17, 18, 19, 20],
+    ];
 
-  //   // Draw fingers
-  //   const fingerConnections = [
-  //     [0, 1, 2, 3, 4], // Thumb
-  //     [0, 5, 6, 7, 8], // Index
-  //     [0, 9, 10, 11, 12], // Middle
-  //     [0, 13, 14, 15, 16], // Ring
-  //     [0, 17, 18, 19, 20], // Pinky
-  //   ];
+    fingerConnections.forEach((finger) => {
+      ctx.beginPath();
+      ctx.strokeStyle = pinkColor;
+      ctx.lineWidth = thick;
+      ctx.moveTo(landmarks[finger[0]].x * width, landmarks[finger[0]].y * height);
+      for (let i = 1; i < finger.length; i++) {
+        ctx.lineTo(landmarks[finger[i]].x * width, landmarks[finger[i]].y * height);
+      }
+      ctx.stroke();
+    });
 
-  //   // Draw each finger as filled shape
-  //   fingerConnections.forEach((finger) => {
-  //     if (finger.length >= 3) {
-  //       ctx.beginPath();
-  //       ctx.moveTo(
-  //         landmarks[finger[0]].x * width,
-  //         landmarks[finger[0]].y * height,
-  //       );
+    const palmPoints = [0, 1, 5, 9, 13, 17, 0];
+    ctx.beginPath();
+    ctx.moveTo(landmarks[0].x * width, landmarks[0].y * height);
+    palmPoints.forEach((idx) => {
+      ctx.lineTo(landmarks[idx].x * width, landmarks[idx].y * height);
+    });
+    ctx.closePath();
+    ctx.fillStyle = pinkColor;
+    ctx.fill();
+    ctx.restore();
+  };
 
-  //       for (let i = 1; i < finger.length; i++) {
-  //         ctx.lineTo(
-  //           landmarks[finger[i]].x * width,
-  //           landmarks[finger[i]].y * height,
-  //         );
-  //       }
-
-  //       // Make shape thicker
-  //       for (let i = finger.length - 2; i >= 0; i--) {
-  //         const offsetX = 6;
-  //         const offsetY = 6;
-  //         ctx.lineTo(
-  //           landmarks[finger[i]].x * width + offsetX,
-  //           landmarks[finger[i]].y * height + offsetY,
-  //         );
-  //       }
-
-  //       ctx.closePath();
-  //       ctx.fillStyle = pinkColor;
-  //       ctx.strokeStyle = pinkOutline;
-  //       ctx.lineWidth = 2;
-  //       ctx.fill();
-  //       ctx.stroke();
-  //     }
-  //   });
-
-  //   // Draw palm
-  //   const palmPoints = [0, 5, 9, 13, 17];
-  //   ctx.beginPath();
-  //   palmPoints.forEach((pointIdx, index) => {
-  //     const point = landmarks[pointIdx];
-  //     if (index === 0) {
-  //       ctx.moveTo(point.x * width, point.y * height);
-  //     } else {
-  //       ctx.lineTo(point.x * width, point.y * height);
-  //     }
-  //   });
-  //   ctx.closePath();
-  //   ctx.fillStyle = pinkColor;
-  //   ctx.strokeStyle = pinkOutline;
-  //   ctx.lineWidth = 2;
-  //   ctx.fill();
-  //   ctx.stroke();
-
-  //   ctx.restore();
-  // };
+  // Function to apply pink glove to any canvas
+  const applyPinkGlove = (ctx, landmarks, width, height) => {
+    applyPinkGloveWithThickness(ctx, landmarks, width, height, width * 0.08);
+  };
 
   // Function to resize image to 160x160 (for LSTM model)
   const resizeTo160x160 = (sourceCanvas) => {
@@ -112,9 +79,9 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
     finalCanvas.height = 160;
     const ctx = finalCanvas.getContext("2d");
 
-    // Fill black like dataset
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, 160, 160);
+    // ❌ DONT FILL BLACK - keep natural background like dataset
+    // ctx.fillStyle = "black";
+    // ctx.fillRect(0, 0, 160, 160);
 
     // Draw centered
     ctx.drawImage(sourceCanvas, 0, 0, 160, 160);
@@ -166,7 +133,10 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
       const ctx = canvas.getContext("2d");
 
       if (!results.multiHandLandmarks?.length) {
-        setHandDetected(false);
+        if (handDetected) {
+          setHandDetected(false);
+          if (onHandLost) onHandLost();
+        }
         return;
       }
 
@@ -175,7 +145,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
       if (lm && ctx) {
         // Apply pink glove to display canvas
-        // applyPinkGlove(ctx, lm, canvas.width, canvas.height);
+        applyPinkGlove(ctx, lm, canvas.width, canvas.height);
 
         // Draw hand landmarks (optional)
         ctx.strokeStyle = "lime";
@@ -220,20 +190,23 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
         const cx = xs.reduce((a, b) => a + b, 0) / xs.length;
         const cy = ys.reduce((a, b) => a + b, 0) / ys.length;
 
-        // EXACT SAME LOGIC AS DATASET
-        const handSizeNorm = Math.max(
-          Math.max(...xs) - Math.min(...xs),
-          Math.max(...ys) - Math.min(...ys),
-        );
+        // Calculate hand size in absolute pixels for accurate comparison
+        const handW_px = (Math.max(...xs) - Math.min(...xs)) * canvas.width;
+        const handH_px = (Math.max(...ys) - Math.min(...ys)) * canvas.height;
 
-        // dataset did: * w * 2.0
-        const boxSize = handSizeNorm * canvas.width * 2.6; // 🔥 2.6 gives elbow room
+        // Use 1.8x for a tight hand crop (LSA64 style)
+        const boxSize = Math.max(handW_px, handH_px) * 1.8;
 
         // centered square
-        const x = Math.max(0, cx * canvas.width - boxSize / 2);
-        const y = Math.max(0, cy * canvas.height - boxSize / 2);
-        const w = Math.min(canvas.width - x, boxSize);
-        const h = Math.min(canvas.height - y, boxSize);
+        let x = cx * canvas.width - boxSize / 2;
+        let y = cy * canvas.height - boxSize / 2;
+
+        // Ensure we stay within the video frame to avoid black borders
+        x = Math.max(0, Math.min(canvas.width - boxSize, x));
+        y = Math.max(0, Math.min(canvas.height - boxSize, y));
+
+        const w = Math.min(boxSize, canvas.width);
+        const h = Math.min(boxSize, canvas.height);
 
         // Draw bounding box
         ctx.strokeStyle = "lime";
@@ -242,7 +215,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
 
         // Throttle frame collection
         const now = Date.now();
-        if (now - lastSent.current < 250) return; // 3-4 FPS
+        if (now - lastSent.current < 100) return; // 10 FPS
         lastSent.current = now;
 
         // Create temporary canvas for cropping
@@ -262,28 +235,27 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
           tempCanvas.height,
         );
 
-        // Apply pink glove to the cropped hand too
+        // Apply pink glove to the cropped hand
+        // Use a thickness proportional to the HAND itself, not the frame
+        const gloveThickness = Math.max(handW_px, handH_px) * 0.15;
         const scaledLandmarks = lm.map((point) => ({
           x: (point.x * canvas.width - x) / w,
           y: (point.y * canvas.height - y) / h,
         }));
-        // applyPinkGlove(tempCtx, scaledLandmarks, w, h);
+
+        // Refined apply pink glove call with custom thickness
+        applyPinkGloveWithThickness(tempCtx, scaledLandmarks, w, h, gloveThickness);
 
         // Resize to 160x160
         const resizedCanvas = resizeTo160x160(tempCanvas);
 
         const dataUrl = resizedCanvas.toDataURL("image/jpeg", 0.9);
 
-        // ===== FRAME STABILITY FILTER =====
-        const prevX = prevCenterRef.current.x;
-        const prevY = prevCenterRef.current.y;
+        // ===== FRAME STABILITY FILTER REMOVED =====
+        // Always sending frame if hand is detected to capture motion
+        onSignFrame && onSignFrame(dataUrl);
 
-        // only send frame if hand is stable (not jumping)
-        if (Math.abs(prevX - cx) < 0.015 && Math.abs(prevY - cy) < 0.015) {
-          onSignFrame && onSignFrame(dataUrl);
-        }
-
-        // update previous center
+        // update previous center (kept for debugging if needed)
         prevCenterRef.current = { x: cx, y: cy };
       }
     });
@@ -433,7 +405,7 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame }) {
               if (detections.length > 0 && onFaceCropped) {
                 const primaryFace = detections.reduce((prev, current) =>
                   current.box.width * current.box.height >
-                  prev.box.width * prev.box.height
+                    prev.box.width * prev.box.height
                     ? current
                     : prev,
                 );

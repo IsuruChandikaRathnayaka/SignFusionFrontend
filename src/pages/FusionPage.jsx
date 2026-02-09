@@ -8,6 +8,7 @@ export default function FusionPage() {
   const [signConf, setSignConf] = useState(0);
   const [sentence, setSentence] = useState("Waiting for fusion...");
   const [sequenceFrames, setSequenceFrames] = useState([]);
+  const [backendFrameCount, setBackendFrameCount] = useState(0);
 
   const lastValidSign = useRef("—");
   const lastValidEmotion = useRef("—");
@@ -29,6 +30,7 @@ export default function FusionPage() {
       setSignConf(0);
       lastValidSign.current = "—";
       setSequenceFrames([]);
+      setBackendFrameCount(0);
       console.log("🧹 Sign buffer cleared");
     } catch (e) {
       console.error("Reset error", e);
@@ -66,8 +68,7 @@ export default function FusionPage() {
     // 👇 STORE FRAME FOR PREVIEW
     setSequenceFrames((prev) => {
       const updated = [...prev, dataUrl];
-      if (updated.length > 30) updated.shift(); // keep last 30
-      return updated;
+      return updated.slice(-30); // Robustly keep only last 30 frames
     });
 
     try {
@@ -79,13 +80,22 @@ export default function FusionPage() {
 
       const data = await res.json();
 
-      if (data.status === "buffering") return;
+      if (data.status === "buffering") {
+        setBackendFrameCount(data.frames_collected);
+        return;
+      }
 
-      if (data.confidence > 0.1) {
-        lastValidSign.current = data.label;
-        setSign(data.label);
+      setBackendFrameCount(30); // Buffer is full
+
+      if (data.status === "predicted" || data.status === "low_confidence") {
         setSignConf(data.confidence);
-        setSequenceFrames([]);
+        // Show the label if we have at least 15% confidence
+        if (data.confidence > 0.15) {
+          setSign(data.label);
+          if (data.status === "predicted") lastValidSign.current = data.label;
+        } else {
+          setSign("—");
+        }
       }
     } catch (e) {
       console.error("Sign error", e);
@@ -125,6 +135,7 @@ export default function FusionPage() {
           <UniversalDetector
             onFaceCropped={onFaceCropped}
             onSignFrame={onSignFrame}
+            onHandLost={resetSignBuffer}
           />
         </div>
 
@@ -151,11 +162,20 @@ export default function FusionPage() {
             <div>Confidence: {(signConf * 100).toFixed(1)}%</div>
           </div>
 
-          <h3>🤖 Fused Output</h3>
           <p style={{ fontSize: 18, fontWeight: "bold", color: "#2196F3" }}>
             {sentence}
           </p>
-          <h3>🎞 Sequence Frames</h3>
+
+          <hr />
+
+          <div style={{ padding: "10px", background: backendFrameCount >= 30 ? "#e8f5e9" : "#fff3e0", borderRadius: "5px", marginBottom: "10px" }}>
+            <strong>Status:</strong> {backendFrameCount < 30 ? "⚡ Buffering..." : "✅ System Ready (Sliding Window)"}
+            <div style={{ fontSize: "14px", fontWeight: "bold", marginTop: "5px" }}>
+              Backend Buffer: {backendFrameCount} / 30 frames
+            </div>
+          </div>
+
+          <h3>🎞 Sequence Preview</h3>
           <div
             style={{
               display: "grid",
