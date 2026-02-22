@@ -127,88 +127,139 @@ export default function FusionPage() {
   }, [emotionConf, signConf]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>🧠 SignFusion — Emotion + Sign Language</h1>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 20px" }} className="animate-fade-in">
+      <header style={{ textAlign: "center", marginBottom: 60 }}>
+        <h1 style={{ fontSize: "3.5rem", fontWeight: 800, marginBottom: 16 }} className="text-gradient-primary">
+          SignFusion AI
+        </h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "1.2rem", maxWidth: 600, margin: "0 auto" }}>
+          Next-generation Sign Language Recognition fused with Real-time Emotion Intelligence.
+        </p>
+      </header>
 
-      <div style={{ display: "flex", gap: 20 }}>
-        <div style={{ flex: 2 }}>
-          <UniversalDetector
-            onFaceCropped={onFaceCropped}
-            onSignFrame={onSignFrame}
-            onHandLost={resetSignBuffer}
-          />
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            padding: 20,
-            background: "#f5f5f5",
-            borderRadius: "8px",
-          }}
-        >
-          <h3>📊 Predictions</h3>
-          <div style={{ marginBottom: 20 }}>
-            <div>
-              <strong>Emotion:</strong> {emotion}
-            </div>
-            <div>Confidence: {(emotionConf * 100).toFixed(1)}%</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 32, alignItems: "start" }}>
+        {/* Left column: Video Feed */}
+        <section className="glass-card" style={{ padding: 24, paddingBottom: 16 }}>
+          <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)", position: "relative" }}>
+            <UniversalDetector
+              onFaceCropped={onFaceCropped}
+              onSignFrame={onSignFrame}
+              onHandLost={resetSignBuffer}
+            />
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <div>
-              <strong>Sign:</strong> {sign}
-            </div>
-            <div>Confidence: {(signConf * 100).toFixed(1)}%</div>
-          </div>
-
-          <p style={{ fontSize: 18, fontWeight: "bold", color: "#2196F3" }}>
-            {sentence}
-          </p>
-
-          <hr />
-
-          <div style={{ padding: "10px", background: backendFrameCount >= 30 ? "#e8f5e9" : "#fff3e0", borderRadius: "5px", marginBottom: "10px" }}>
-            <strong>Status:</strong> {backendFrameCount < 30 ? "⚡ Buffering..." : "✅ System Ready (Sliding Window)"}
-            <div style={{ fontSize: "14px", fontWeight: "bold", marginTop: "5px" }}>
-              Backend Buffer: {backendFrameCount} / 30 frames
-            </div>
-          </div>
-
-          <h3>🎞 Sequence Preview</h3>
-          <div
-            style={{
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: "0.9rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 16 }}>
+              🎞 Sequence Stream (Last 30 Frames)
+            </h3>
+            <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(10, 1fr)",
-              gap: "4px",
-              maxWidth: "500px",
-            }}
-          >
-            {sequenceFrames.map((frame, i) => (
-              <img
-                key={i}
-                src={frame}
-                alt={`frame-${i}`}
-                style={{ width: "100%", border: "1px solid #ccc" }}
-              />
-            ))}
+              gridTemplateColumns: "repeat(15, 1fr)",
+              gap: 4,
+              padding: 8,
+              background: "rgba(0,0,0,0.2)",
+              borderRadius: 12
+            }}>
+              {sequenceFrames.slice(-30).map((frame, i) => (
+                <div key={i} style={{ aspectRatio: "1/1", borderRadius: 4, overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <img src={frame} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ))}
+              {Array.from({ length: 30 - sequenceFrames.length }).map((_, i) => (
+                <div key={`empty-${i}`} style={{ aspectRatio: "1/1", background: "rgba(255,255,255,0.02)", borderRadius: 4 }} />
+              ))}
+            </div>
           </div>
-          <button
-            onClick={resetSignBuffer}
-            style={{
-              marginTop: "15px",
-              padding: "10px 15px",
-              background: "#ff9800",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            🔄 Reset Sign Detection
-          </button>
-        </div>
+        </section>
+
+        {/* Right column: Predictions */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* Prediction Card */}
+          <div className="glass-card" style={{ padding: 32 }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: 32 }}>Intelligence Center</h2>
+
+            {/* Emotion Card */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "flex-end" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Current Emotion</span>
+                <span style={{ color: "var(--primary)", fontWeight: 600 }}>{(emotionConf * 100).toFixed(0)}%</span>
+              </div>
+              <div className="prediction-value" style={{ marginBottom: 12 }}>{emotion}</div>
+              <div className="confidence-bar">
+                <div className="confidence-fill" style={{ width: `${emotionConf * 100}%`, background: "var(--primary)", boxShadow: "0 0 20px var(--primary-glow)" }} />
+              </div>
+            </div>
+
+            {/* Sign Card */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "flex-end" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Gesture Label</span>
+                <span style={{ color: "var(--secondary)", fontWeight: 600 }}>{(signConf * 100).toFixed(0)}%</span>
+              </div>
+              <div className="prediction-value" style={{ marginBottom: 12 }}>{sign}</div>
+              <div className="confidence-bar">
+                <div className="confidence-fill" style={{ width: `${signConf * 100}%`, background: "var(--secondary)", boxShadow: "0 0 20px var(--secondary-glow)" }} />
+              </div>
+            </div>
+
+            {/* Fusion Output */}
+            <div style={{
+              padding: 24,
+              background: "linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1))",
+              borderRadius: 20,
+              border: "1px solid rgba(139, 92, 246, 0.2)",
+              textAlign: "center"
+            }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "block", marginBottom: 12, textTransform: "uppercase" }}>Generated Interpretation</span>
+              <p style={{ fontSize: "1.25rem", fontWeight: 600, lineHeight: 1.4, color: "white" }}>
+                "{sentence}"
+              </p>
+            </div>
+          </div>
+
+          {/* Buffer Status Card */}
+          <div className="glass-card" style={{ padding: 24, textAlign: "center" }}>
+            <div style={{
+              display: "inline-block",
+              padding: "8px 16px",
+              borderRadius: 30,
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              marginBottom: 16,
+              background: backendFrameCount >= 30 ? "rgba(34, 197, 94, 0.1)" : "rgba(245, 158, 11, 0.1)",
+              color: backendFrameCount >= 30 ? "#22c55e" : "#f59e0b",
+              border: `1px solid ${backendFrameCount >= 30 ? "rgba(34, 197, 94, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
+            }}>
+              {backendFrameCount < 30 ? `⚡ Processing: ${backendFrameCount}/30` : "✅ System Ready"}
+            </div>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.6 }}>
+              {backendFrameCount < 30
+                ? "Collecting frame sequences to enable sliding-window inference..."
+                : "Real-time gesture analysis active with 30-frame temporal memory."}
+            </p>
+            {/* 
+            <button
+              onClick={resetSignBuffer}
+              style={{
+                marginTop: "15px",
+                width: "100%",
+                padding: "10px",
+                background: "rgba(255,255,255,0.05)",
+                color: "white",
+                border: "1px solid var(--surface-border)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: "600",
+                transition: "var(--transition)"
+              }}
+              onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.1)"}
+              onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.05)"}
+            >
+              🔄 Clear Gesture Buffer
+            </button> 
+            */}
+          </div>
+        </aside>
       </div>
     </div>
   );
