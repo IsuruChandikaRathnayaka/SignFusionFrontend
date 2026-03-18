@@ -3,6 +3,7 @@ import UniversalDetector from "../components/UniversalDetector";
 
 export default function SignPage() {
   const [sign, setSign] = useState("No sign detected");
+  const [labelName, setLabelName] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [sequenceFrames, setSequenceFrames] = useState([]);
   const [backendFrameCount, setBackendFrameCount] = useState(0);
@@ -13,6 +14,7 @@ export default function SignPage() {
     try {
       await fetch("http://127.0.0.1:5001/sign/reset", { method: "POST" });
       setSign("—");
+      setLabelName("");
       setConfidence(0);
       setSequenceFrames([]);
       setBackendFrameCount(0);
@@ -48,8 +50,10 @@ export default function SignPage() {
         setConfidence(((data.confidence || 0) * 100).toFixed(1));
         if (data.confidence > 0.15) {
           setSign(data.label);
+          setLabelName(data.label_name || "");
         } else {
           setSign("—");
+          setLabelName("");
         }
       }
     } catch (err) {
@@ -113,7 +117,7 @@ export default function SignPage() {
                 <span style={{ color: "var(--secondary)", fontWeight: 600 }}>{confidence}%</span>
               </div>
               <div className="prediction-value" style={{ marginBottom: 12 }}>
-                {sign}
+                {labelName ? `${labelName} (${sign})` : sign}
               </div>
               <div className="confidence-bar">
                 <div

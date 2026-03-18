@@ -115,7 +115,7 @@ export default function VerifyPage() {
                     color: "var(--secondary)",
                     textShadow: "0 0 20px var(--secondary-glow)"
                   }}>
-                    {result.predicted_label}
+                    {result.label_name ? `${result.label_name} (${result.predicted_label})` : result.predicted_label}
                   </div>
                 </div>
 

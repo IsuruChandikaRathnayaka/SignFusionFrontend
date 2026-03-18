@@ -5,6 +5,7 @@ export default function FusionPage() {
   const [emotion, setEmotion] = useState("—");
   const [emotionConf, setEmotionConf] = useState(0);
   const [sign, setSign] = useState("—");
+  const [signLabelName, setSignLabelName] = useState("");
   const [signConf, setSignConf] = useState(0);
   const [sentence, setSentence] = useState("Waiting for fusion...");
   const [sequenceFrames, setSequenceFrames] = useState([]);
@@ -27,6 +28,7 @@ export default function FusionPage() {
       });
 
       setSign("—");
+      setSignLabelName("");
       setSignConf(0);
       lastValidSign.current = "—";
       setSequenceFrames([]);
@@ -92,9 +94,11 @@ export default function FusionPage() {
         // Show the label if we have at least 15% confidence
         if (data.confidence > 0.15) {
           setSign(data.label);
+          setSignLabelName(data.label_name || "");
           if (data.status === "predicted") lastValidSign.current = data.label;
         } else {
           setSign("—");
+          setSignLabelName("");
         }
       }
     } catch (e) {
@@ -196,7 +200,9 @@ export default function FusionPage() {
                 <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Gesture Label</span>
                 <span style={{ color: "var(--secondary)", fontWeight: 600 }}>{(signConf * 100).toFixed(0)}%</span>
               </div>
-              <div className="prediction-value" style={{ marginBottom: 12 }}>{sign}</div>
+              <div className="prediction-value" style={{ marginBottom: 12 }}>
+                {signLabelName ? `${signLabelName} (${sign})` : sign}
+              </div>
               <div className="confidence-bar">
                 <div className="confidence-fill" style={{ width: `${signConf * 100}%`, background: "var(--secondary)", boxShadow: "0 0 20px var(--secondary-glow)" }} />
               </div>
