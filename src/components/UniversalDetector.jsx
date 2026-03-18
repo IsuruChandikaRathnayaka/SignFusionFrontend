@@ -144,8 +144,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
       const lm = results.multiHandLandmarks[0];
 
       if (lm && ctx) {
-        // Apply pink glove to display canvas
-        applyPinkGlove(ctx, lm, canvas.width, canvas.height);
+        // Apply pink glove to display canvas (COMMENTED OUT)
+        // applyPinkGlove(ctx, lm, canvas.width, canvas.height);
 
         // Draw hand landmarks (optional)
         ctx.strokeStyle = "lime";
@@ -243,8 +243,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
           y: (point.y * canvas.height - y) / h,
         }));
 
-        // Refined apply pink glove call with custom thickness
-        applyPinkGloveWithThickness(tempCtx, scaledLandmarks, w, h, gloveThickness);
+        // Refined apply pink glove call with custom thickness (COMMENTED OUT)
+        // applyPinkGloveWithThickness(tempCtx, scaledLandmarks, w, h, gloveThickness);
 
         // Resize to 160x160
         const resizedCanvas = resizeTo160x160(tempCanvas);
