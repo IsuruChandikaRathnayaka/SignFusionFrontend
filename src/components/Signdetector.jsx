@@ -84,7 +84,7 @@ export default function SignDetector({ onSignFrame }) {
       // Draw cropped hand
       offCtx.drawImage(video, x, y, w, h, 0, 0, w, h);
 
-      // 🔥 CONVERT TO GRAYSCALE
+      // CONVERT TO GRAYSCALE
       const imgData = offCtx.getImageData(0, 0, w, h);
       for (let i = 0; i < imgData.data.length; i += 4) {
         const r = imgData.data[i];
@@ -128,7 +128,7 @@ export default function SignDetector({ onSignFrame }) {
       />
       <div>
         <strong>Status:</strong>{" "}
-        {handDetected ? "✋ Hand detected" : "❌ No hand"}
+        {handDetected ? "Hand detected" : "No hand"}
       </div>
     </div>
   );

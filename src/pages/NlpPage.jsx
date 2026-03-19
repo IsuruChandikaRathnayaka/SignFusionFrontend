@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+//set of signs and emotions
 const SIGNS = [
     "Accept", "Amused", "Annoyed", "Appear", "Argentina", "Away", "Barbecue", "Bathe", "Birthday", "Bitter",
     "Bored", "Born", "Breakfast", "Bright", "Buy", "Call", "Candy", "Catch", "Chewing-gum", "Coin",
@@ -11,7 +11,7 @@ const SIGNS = [
     "Sad", "Ship", "Shut-down", "Shy", "Sick", "Skimmer", "Son", "Spaghetti", "Stressed", "Surprised",
     "Sweet-milk", "Thanks", "Thoughtful", "Tired", "To-land", "Trap", "Uruguay", "Water", "Where", "Women",
     "Worried", "Yellow", "Yogurt"
-].sort(); // Use alphabetized view for user convenience
+].sort(); // Use alphabetized view 
 
 const EMOTIONS = [
     "happy", "sad", "neutral", "angry", "surprised", "excited", "confused", "proud",

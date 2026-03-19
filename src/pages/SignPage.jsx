@@ -24,7 +24,7 @@ export default function SignPage() {
   };
 
   const handleSignFrame = useCallback(async (dataUrl) => {
-    // 👇 STORE FRAME FOR PREVIEW
+    // STORE FRAME FOR PREVIEW
     setSequenceFrames((prev) => {
       const updated = [...prev, dataUrl];
       return updated.slice(-30);
@@ -150,7 +150,7 @@ export default function SignPage() {
                 color: backendFrameCount >= 30 ? "#22c55e" : "#f59e0b",
                 border: `1px solid ${backendFrameCount >= 30 ? "rgba(34, 197, 94, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
               }}>
-                {backendFrameCount < 30 ? `⚡ Collect: ${backendFrameCount}/30` : "✅ Ready"}
+                {backendFrameCount < 30 ? `Collect: ${backendFrameCount}/30` : "Ready"}
               </div>
               <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
                 {backendFrameCount < 30 ? "Buffering temporal frames..." : "Temporal inference active."}

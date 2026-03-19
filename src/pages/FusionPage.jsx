@@ -33,13 +33,13 @@ export default function FusionPage() {
       lastValidSign.current = "—";
       setSequenceFrames([]);
       setBackendFrameCount(0);
-      console.log("🧹 Sign buffer cleared");
+      console.log("Sign buffer cleared");
     } catch (e) {
       console.error("Reset error", e);
     }
   };
 
-  // Emotion handler (unchanged)
+  // Emotion handler
   const onFaceCropped = useCallback(async (dataUrl) => {
     const now = Date.now();
     if (now - lastSign.current < 700) return;
@@ -65,9 +65,9 @@ export default function FusionPage() {
     }
   }, []);
 
-  // UPDATED: Sign handler to send sequence
+  // Sign handler to send sequence
   const onSignFrame = useCallback(async (dataUrl) => {
-    // 👇 STORE FRAME FOR PREVIEW
+    // STORE FRAME FOR PREVIEW
     setSequenceFrames((prev) => {
       const updated = [...prev, dataUrl];
       return updated.slice(-30); // Robustly keep only last 30 frames
@@ -261,7 +261,7 @@ export default function FusionPage() {
               onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.1)"}
               onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.05)"}
             >
-              🔄 Clear Gesture Buffer
+              Clear Gesture Buffer
             </button> 
             */}
           </div>

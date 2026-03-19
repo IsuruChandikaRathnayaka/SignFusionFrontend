@@ -78,12 +78,8 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
     finalCanvas.width = 160;
     finalCanvas.height = 160;
     const ctx = finalCanvas.getContext("2d");
-
-    // ❌ DONT FILL BLACK - keep natural background like dataset
     // ctx.fillStyle = "black";
     // ctx.fillRect(0, 0, 160, 160);
-
-    // Draw centered
     ctx.drawImage(sourceCanvas, 0, 0, 160, 160);
 
     return finalCanvas;
@@ -103,7 +99,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
       data[i] = gray; // Red
       data[i + 1] = gray; // Green
       data[i + 2] = gray; // Blue
-      // Alpha channel stays the same
     }
 
     ctx.putImageData(imgData, 0, 0);
@@ -146,7 +141,6 @@ export default function UniversalDetector({ onFaceCropped, onSignFrame, onHandLo
       if (lm && ctx) {
         // Apply pink glove to display canvas (COMMENTED OUT)
         // applyPinkGlove(ctx, lm, canvas.width, canvas.height);
-
         // Draw hand landmarks (optional)
         ctx.strokeStyle = "lime";
         ctx.lineWidth = 2;

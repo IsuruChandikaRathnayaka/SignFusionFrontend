@@ -251,7 +251,7 @@ export default function Detector({ onFaceCropped }) {
           // Process the most prominent face (largest or highest score)
           const primaryFace = detections.reduce((prev, current) =>
             current.box.width * current.box.height >
-            prev.box.width * prev.box.height
+              prev.box.width * prev.box.height
               ? current
               : prev
           );
@@ -284,7 +284,7 @@ export default function Detector({ onFaceCropped }) {
               tempCanvas.width = cropWidth;
               tempCanvas.height = cropHeight;
 
-              // 🚫 NO mirror tricks here – just crop directly
+              //Crop directly
               tempCtx.drawImage(
                 videoRef.current,
                 cropX,
@@ -356,7 +356,7 @@ export default function Detector({ onFaceCropped }) {
     <div className="detector-container">
       {error && (
         <div className="error-message">
-          <h3>⚠️ Error</h3>
+          <h3>Error</h3>
           <p>{error}</p>
           <div className="error-actions">
             <button onClick={retryCamera} className="retry-btn">
@@ -440,10 +440,10 @@ export default function Detector({ onFaceCropped }) {
 
           <div className="status-indicators">
             <div className={`status ${modelsLoaded ? "success" : "loading"}`}>
-              {modelsLoaded ? "✓ Models Loaded" : "⏳ Loading Models..."}
+              {modelsLoaded ? "Models Loaded" : "Loading Models..."}
             </div>
             <div className={`status ${isCameraActive ? "success" : "loading"}`}>
-              {isCameraActive ? "✓ Camera Active" : "⏳ Camera..."}
+              {isCameraActive ? "Camera Active" : "Camera..."}
             </div>
             <div
               className={`status ${detectionActive ? "active" : "inactive"}`}
@@ -478,8 +478,8 @@ export default function Detector({ onFaceCropped }) {
                   </p>
                   {faceCount > 0 && (
                     <div className="face-info">
-                      <p>✅ Face detected and being processed</p>
-                      <p>📤 Sending to emotion analysis...</p>
+                      <p>Face detected and being processed</p>
+                      <p>Sending to emotion analysis...</p>
                     </div>
                   )}
                 </div>

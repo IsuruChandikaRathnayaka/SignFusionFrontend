@@ -80,7 +80,7 @@ export default function VerifyPage() {
             </p>
             {files.length > 0 && files.length !== 30 && (
               <p style={{ color: "#ef4444", fontSize: "0.85rem", marginTop: 12, fontWeight: 600 }}>
-                ⚠️ Requirement: 30 frames. Currently: {files.length}
+                Requirement: 30 frames. Currently: {files.length}
               </p>
             )}
           </div>
@@ -96,7 +96,7 @@ export default function VerifyPage() {
               opacity: (isLoading || files.length !== 30) ? 0.5 : 1
             }}
           >
-            {isLoading ? "⚙️ Auditing Model..." : "🔍 Run Diagnostic"}
+            {isLoading ? "Auditing Model..." : "Run Diagnostic"}
           </button>
         </section>
 

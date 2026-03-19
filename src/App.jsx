@@ -15,6 +15,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <OnboardingTour />
+      {/*Lower Navbar*/}
       <div className="nav-dock-container">
         <nav className="glass-dock">
           <NavLink to="/" end>
@@ -34,7 +35,7 @@ export default function App() {
           </NavLink>
         </nav>
       </div>
-
+      {/*Routes*/}
       <main style={{ minHeight: "100vh", paddingBottom: "120px" }}>
         <Routes>
           <Route path="/" element={<FusionPage />} />

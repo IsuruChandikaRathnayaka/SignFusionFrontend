@@ -6,7 +6,7 @@ import img3 from "../assets/grin.png";
 import img4 from "../assets/brain.png";
 import img5 from "../assets/shield-trust.png";
 import img6 from "../assets/brain-doubt.png";
-
+//The List of steps for the onboarding tour
 const steps = [
     {
         title: "Welcome to SignFusion",

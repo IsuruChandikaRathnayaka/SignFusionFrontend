@@ -124,11 +124,11 @@ export default function EmotionIntelligencePage() {
                         }}
                     >
                         <span style={{ fontSize: "0.9rem", color: isLoading ? "var(--primary)" : "var(--text-muted)" }}>
-                            {isLoading ? "⚡ Analyzing micro-expressions..." : "🟢 Engine Synchronized"}
+                            {isLoading ? "Analyzing micro-expressions..." : "Engine Synchronized"}
                         </span>
                         {errorMsg && (
                             <p style={{ color: "#ef4444", fontSize: "0.85rem", marginTop: 8 }}>
-                                ⚠️ {errorMsg}
+                                {errorMsg}
                             </p>
                         )}
                     </div>
